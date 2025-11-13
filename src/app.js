@@ -1,3 +1,4 @@
+// src/app.js
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
@@ -15,21 +16,32 @@ const PORT = process.env.PORT || 7000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// SERVE ARQUIVOS ESTÁTICOS
+// Servir arquivos estáticos da pasta "public"
 app.use(express.static(path.join(__dirname, "public")));
 
-// ROTA PRINCIPAL
+// Rota principal
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// CALLBACK TRATKT
+// Rota de autenticação com o Trakt
+app.get("/auth", (req, res) => {
+  const redirectUri = process.env.TRAKT_REDIRECT_URI;
+  const clientId = process.env.TRAKT_CLIENT_ID;
+  const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
+  res.redirect(traktAuthUrl);
+});
+
+// Rota de callback do Trakt
 app.get("/callback", async (req, res) => {
   const { code, state } = req.query;
-  if (!code) return res.sendFile(path.join(__dirname, "public", "error.html"));
+
+  if (!code) {
+    return res.sendFile(path.join(__dirname, "public", "error.html"));
+  }
 
   try {
-    const tokenResponse = await axios.post(
+    const response = await axios.post(
       "https://api.trakt.tv/oauth/token",
       {
         code,
@@ -37,21 +49,38 @@ app.get("/callback", async (req, res) => {
         client_secret: process.env.TRAKT_CLIENT_SECRET,
         redirect_uri: process.env.TRAKT_REDIRECT_URI,
         grant_type: "authorization_code",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
-    const tokenData = tokenResponse.data;
 
-    const userId = state || "default"; // evita undefined
+    const tokenData = {
+      accessToken: response.data.access_token,
+      refreshToken: response.data.refresh_token,
+      expiresAt: Date.now() + response.data.expires_in * 1000,
+    };
+
+    // Salva token no Redis
+    const userId = state || "default";
     await storeToken(userId, tokenData);
+    console.log(`Token salvo para userId: ${userId}`);
 
+    // Redireciona para página de sucesso
     res.sendFile(path.join(__dirname, "public", "success.html"));
   } catch (err) {
-    console.error("Erro callback Trakt:", err);
+    console.error("Erro callback Trakt:", err.message);
     res.sendFile(path.join(__dirname, "public", "error.html"));
   }
 });
 
-// START SERVER
+// Inicia o addon
+const addon = createAddon(process.env.ADDON_BASE_URL);
+console.log("Addon iniciado");
+
+// Start server
 app.listen(PORT, () => {
   console.log(`Addon listening on port ${PORT}`);
 });
