@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import addon from "./addon.js";
+import { addon } from "./addon.js";
 import { storeToken, getToken } from "./redis.js";
 import axios from "axios";
 

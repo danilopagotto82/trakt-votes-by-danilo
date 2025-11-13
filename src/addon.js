@@ -15,8 +15,13 @@ const manifest = {
   }
 };
 
-export function createAddon(baseUrl) {
-  const builder = new addonBuilder(manifest);
-  // No catalog registered - we expose manifest/meta/stream via express manually.
-  return { manifest };
-}
+// Criar o builder do addon
+const builder = new addonBuilder(manifest);
+
+// Aqui você pode definir como o addon vai responder às requisições “meta” e “stream”
+// (podemos completar isso depois com a integração do Trakt)
+
+builder.defineManifestHandler(() => manifest);
+
+// Exporta o addon corretamente
+export const addon = builder.getInterface();
