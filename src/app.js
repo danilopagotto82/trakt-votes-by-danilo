@@ -13,36 +13,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 7000;
 
-// Trabalhar com __dirname em ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Servir arquivos estáticos da pasta "public"
+// Servir arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, "public")));
 
 // Cria o addon
-const addon = createAddon(process.env.ADDON_BASE_URL);
+const addon = createAddon();
 
-// Rota principal (index.html)
+// Rota principal
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Rota de autenticação com Trakt
+// Rota de autenticação Trakt
 app.get("/auth", (req, res) => {
   const redirectUri = process.env.TRAKT_REDIRECT_URI;
   const clientId = process.env.TRAKT_CLIENT_ID;
 
   let userId = req.query.user;
-  if (!userId) {
-    userId = uuidv4(); // cria ID se não existir
-  }
+  if (!userId) userId = uuidv4();
 
   const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${userId}`;
   res.redirect(traktAuthUrl);
 });
 
-// Callback do Trakt
+// Callback Trakt
 app.get("/callback", async (req, res) => {
   const { code, state: userId } = req.query;
 
@@ -69,7 +66,7 @@ app.get("/callback", async (req, res) => {
 
     res.sendFile(path.join(__dirname, "public", "success.html"));
   } catch (err) {
-    console.error("Erro no callback do Trakt:", err.message);
+    console.error("Erro callback Trakt:", err.message);
     res.sendFile(path.join(__dirname, "public", "error.html"));
   }
 });
@@ -77,13 +74,11 @@ app.get("/callback", async (req, res) => {
 // Logout
 app.get("/logout", async (req, res) => {
   const userId = req.query.user;
-  if (userId) {
-    await deleteToken(userId);
-  }
-  res.send("Logout realizado com sucesso!");
+  if (userId) await deleteToken(userId);
+  res.send("Logout realizado!");
 });
 
-// Inicia o servidor
+// Inicia servidor
 app.listen(PORT, () => {
   console.log(`Addon listening on port ${PORT}`);
 });

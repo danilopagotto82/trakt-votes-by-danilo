@@ -1,3 +1,4 @@
+// src/addon.js
 import { addonBuilder } from "stremio-addon-sdk";
 
 const manifest = {
@@ -11,17 +12,13 @@ const manifest = {
   catalogs: [],
   behaviorHints: {
     configurable: false,
-    webview: false
-  }
+    webview: false,
+  },
 };
 
-// Criar o builder do addon
-const builder = new addonBuilder(manifest);
+export function createAddon() {
+  const builder = new addonBuilder(manifest);
+  return builder;
+}
 
-// Aqui você pode definir como o addon vai responder às requisições “meta” e “stream”
-// (podemos completar isso depois com a integração do Trakt)
-
-builder.defineManifestHandler(() => manifest);
-
-// Exporta o addon corretamente
-export const addon = builder.getInterface();
+export { manifest };
