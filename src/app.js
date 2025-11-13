@@ -1,4 +1,3 @@
-// src/app.js
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
@@ -16,12 +15,12 @@ const PORT = process.env.PORT || 7000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Servir arquivos estáticos da pasta "public"
-app.use(express.static(path.join(__dirname, "public")));
+// Servir arquivos estáticos da pasta "public" (fora de src)
+app.use(express.static(path.join(__dirname, "../public")));
 
 // Rota principal
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(__dirname, "../public", "index.html"));
 });
 
 // Rota de autenticação com o Trakt
@@ -37,7 +36,7 @@ app.get("/callback", async (req, res) => {
   const { code, state } = req.query;
 
   if (!code) {
-    return res.sendFile(path.join(__dirname, "public", "error.html"));
+    return res.sendFile(path.join(__dirname, "../public", "error.html"));
   }
 
   try {
@@ -69,10 +68,10 @@ app.get("/callback", async (req, res) => {
     console.log(`Token salvo para userId: ${userId}`);
 
     // Redireciona para página de sucesso
-    res.sendFile(path.join(__dirname, "public", "success.html"));
+    res.sendFile(path.join(__dirname, "../public", "success.html"));
   } catch (err) {
     console.error("Erro callback Trakt:", err.message);
-    res.sendFile(path.join(__dirname, "public", "error.html"));
+    res.sendFile(path.join(__dirname, "../public", "error.html"));
   }
 });
 
