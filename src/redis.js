@@ -1,33 +1,50 @@
+// src/redis.js
 import { Redis } from "@upstash/redis";
-import { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } from "./config.js";
 
-export const redis = new Redis({
-  url: UPSTASH_REDIS_REST_URL,
-  token: UPSTASH_REDIS_REST_TOKEN,
+// Cria a conexão com o Upstash Redis usando as variáveis de ambiente
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// helpers
-export async function saveTokenForUser(userId, tokenObj) {
-  // tokenObj: { access_token, refresh_token, expires_at_unix }
-  const key = `trakt:${userId}`;
-  await redis.set(key, JSON.stringify(tokenObj));
-  // optional: set TTL larger than Refresh token life so it persists
-  return true;
+/**
+ * Salva os tokens do Trakt para um userId
+ * @param {string} userId
+ * @param {object} tokenData - { accessToken, refreshToken, expiresAt }
+ */
+export async function storeToken(userId, tokenData) {
+  try {
+    await redis.set(`trakt:${userId}`, JSON.stringify(tokenData));
+    console.log(`Token salvo para userId: ${userId}`);
+  } catch (err) {
+    console.error("Erro ao salvar token no Redis:", err);
+  }
 }
 
-export async function getTokenForUser(userId) {
-  const key = `trakt:${userId}`;
-  const raw = await redis.get(key);
-  if (!raw) return null;
+/**
+ * Recupera os tokens do Trakt para um userId
+ * @param {string} userId
+ * @returns {object|null} tokenData
+ */
+export async function getToken(userId) {
   try {
-    return JSON.parse(raw);
-  } catch (e) {
+    const data = await redis.get(`trakt:${userId}`);
+    return data ? JSON.parse(data) : null;
+  } catch (err) {
+    console.error("Erro ao buscar token no Redis:", err);
     return null;
   }
 }
 
-export async function deleteTokenForUser(userId) {
-  const key = `trakt:${userId}`;
-  await redis.del(key);
-  return true;
+/**
+ * Remove os tokens do Redis para um userId
+ * @param {string} userId
+ */
+export async function deleteToken(userId) {
+  try {
+    await redis.del(`trakt:${userId}`);
+    console.log(`Token removido para userId: ${userId}`);
+  } catch (err) {
+    console.error("Erro ao deletar token no Redis:", err);
+  }
 }

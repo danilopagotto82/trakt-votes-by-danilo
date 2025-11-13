@@ -1,67 +1,89 @@
+// src/app.js
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { addon } from "./addon.js";
-import { storeToken, getToken } from "./redis.js";
+import { createAddon } from "./addon.js";
+import { storeToken, getToken, deleteToken } from "./redis.js";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 7000;
 
-// Necessário para trabalhar com __dirname em módulos ES
+// Trabalhar com __dirname em ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Servir os arquivos estáticos da pasta "public"
+// Servir arquivos estáticos da pasta "public"
 app.use(express.static(path.join(__dirname, "public")));
 
-// Rota principal (renderiza o index.html)
+// Cria o addon
+const addon = createAddon(process.env.ADDON_BASE_URL);
+
+// Rota principal (index.html)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Rota para autenticação com o Trakt
+// Rota de autenticação com Trakt
 app.get("/auth", (req, res) => {
   const redirectUri = process.env.TRAKT_REDIRECT_URI;
   const clientId = process.env.TRAKT_CLIENT_ID;
-  const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
+
+  let userId = req.query.user;
+  if (!userId) {
+    userId = uuidv4(); // cria ID se não existir
+  }
+
+  const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${userId}`;
   res.redirect(traktAuthUrl);
 });
 
-// Rota de callback (Trakt redireciona pra cá após login)
+// Callback do Trakt
 app.get("/callback", async (req, res) => {
-  const code = req.query.code;
-  if (!code) {
-    return res.sendFile(path.join(__dirname, "public", "error.html"));
-  }
+  const { code, state: userId } = req.query;
 
   try {
-    const response = await axios.post("https://api.trakt.tv/oauth/token", {
-      code,
-      client_id: process.env.TRAKT_CLIENT_ID,
-      client_secret: process.env.TRAKT_CLIENT_SECRET,
-      redirect_uri: process.env.TRAKT_REDIRECT_URI,
-      grant_type: "authorization_code",
-    });
+    const response = await axios.post(
+      "https://api.trakt.tv/oauth/token",
+      {
+        code,
+        client_id: process.env.TRAKT_CLIENT_ID,
+        client_secret: process.env.TRAKT_CLIENT_SECRET,
+        redirect_uri: process.env.TRAKT_REDIRECT_URI,
+        grant_type: "authorization_code",
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
 
-    const { access_token } = response.data;
-    await storeToken("main_user", access_token);
+    const tokenData = {
+      accessToken: response.data.access_token,
+      refreshToken: response.data.refresh_token,
+      expiresAt: Date.now() + response.data.expires_in * 1000,
+    };
+
+    await storeToken(userId, tokenData);
+
     res.sendFile(path.join(__dirname, "public", "success.html"));
-  } catch (error) {
-    console.error(error.response?.data || error);
+  } catch (err) {
+    console.error("Erro no callback do Trakt:", err.message);
     res.sendFile(path.join(__dirname, "public", "error.html"));
   }
 });
 
-// Rota do Manifest (Stremio)
-app.get("/manifest.json", (req, res) => {
-  res.json(addon.manifest);
+// Logout
+app.get("/logout", async (req, res) => {
+  const userId = req.query.user;
+  if (userId) {
+    await deleteToken(userId);
+  }
+  res.send("Logout realizado com sucesso!");
 });
 
-// Inicializar o servidor
+// Inicia o servidor
 app.listen(PORT, () => {
   console.log(`Addon listening on port ${PORT}`);
 });
