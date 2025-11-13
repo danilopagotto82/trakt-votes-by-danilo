@@ -1,4 +1,3 @@
-// src/app.js
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
@@ -16,28 +15,18 @@ const PORT = process.env.PORT || 7000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Servir arquivos estáticos da pasta "public"
+// SERVE ARQUIVOS ESTÁTICOS
 app.use(express.static(path.join(__dirname, "public")));
 
-// Rota principal
+// ROTA PRINCIPAL
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Rota de autenticação com o Trakt
-app.get("/auth", (req, res) => {
-  const redirectUri = process.env.TRAKT_REDIRECT_URI;
-  const clientId = process.env.TRAKT_CLIENT_ID;
-  const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
-  res.redirect(traktAuthUrl);
-});
-
-// Callback do Trakt
+// CALLBACK TRATKT
 app.get("/callback", async (req, res) => {
   const { code, state } = req.query;
-  if (!code) {
-    return res.sendFile(path.join(__dirname, "public", "error.html"));
-  }
+  if (!code) return res.sendFile(path.join(__dirname, "public", "error.html"));
 
   try {
     const tokenResponse = await axios.post(
@@ -48,34 +37,21 @@ app.get("/callback", async (req, res) => {
         client_secret: process.env.TRAKT_CLIENT_SECRET,
         redirect_uri: process.env.TRAKT_REDIRECT_URI,
         grant_type: "authorization_code",
-      },
-      { headers: { "Content-Type": "application/json" } }
+      }
     );
+    const tokenData = tokenResponse.data;
 
-    // Salvar token no Redis usando state como userId temporário
-    await storeToken(state, {
-      accessToken: tokenResponse.data.access_token,
-      refreshToken: tokenResponse.data.refresh_token,
-      expiresAt: Date.now() + tokenResponse.data.expires_in * 1000,
-    });
+    const userId = state || "default"; // evita undefined
+    await storeToken(userId, tokenData);
 
-    console.log(`Token salvo para userId: ${state}`);
     res.sendFile(path.join(__dirname, "public", "success.html"));
   } catch (err) {
-    console.error("Erro callback Trakt:", err.response?.data || err.message);
+    console.error("Erro callback Trakt:", err);
     res.sendFile(path.join(__dirname, "public", "error.html"));
   }
 });
 
-// Inicializa addon
-const addon = createAddon(process.env.ADDON_BASE_URL);
-
-// Exemplo de rota manifest do Stremio
-app.get("/manifest.json", (req, res) => {
-  res.json(addon.manifest);
-});
-
-// Start do servidor
+// START SERVER
 app.listen(PORT, () => {
   console.log(`Addon listening on port ${PORT}`);
 });
